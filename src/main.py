@@ -138,6 +138,35 @@ def main():
         # Check rate limit
         github_client.check_rate_limit()
 
+        # Test data sources
+        logger.info(f"\n{'='*60}")
+        logger.info("Testing Data Sources")
+        logger.info(f"{'='*60}")
+
+        # Test GitHub API
+        if 'github' in config.enabled_data_sources:
+            try:
+                test_repo = github_client.get_repo_metrics("kubernetes/kubernetes")
+                if test_repo and test_repo.get('stars', 0) > 0:
+                    logger.info(f"✓ GitHub API: Working (test repo has {test_repo['stars']} stars)")
+                else:
+                    logger.warning(f"⚠ GitHub API: Returned data but no stars")
+            except Exception as e:
+                logger.error(f"✗ GitHub API: Failed - {type(e).__name__}: {e}")
+                logger.warning(f"  Analysis will continue but GitHub metrics will be unavailable")
+
+        # Test deps.dev API
+        if 'depsdev' in config.enabled_data_sources:
+            try:
+                test_pkg = depsdev_client.get_package_metrics("pypi", "requests", "2.31.0")
+                if test_pkg and test_pkg.get('data_available'):
+                    logger.info(f"✓ deps.dev API: Working")
+                else:
+                    logger.warning(f"⚠ deps.dev API: Returned data but no dependents")
+            except Exception as e:
+                logger.error(f"✗ deps.dev API: Failed - {type(e).__name__}: {e}")
+                logger.warning(f"  Analysis will continue but deps.dev metrics will be unavailable")
+
         # Phase 1: Fetch top repositories
         logger.info(f"\n{'='*60}")
         logger.info("Phase 1: Fetching top repositories")
@@ -194,6 +223,14 @@ def main():
             'total': 0
         }
 
+        # Success tracking
+        success_stats = {
+            'github_success': 0,
+            'github_failed': 0,
+            'depsdev_success': 0,
+            'depsdev_failed': 0
+        }
+
         for i, (dep_key, dep_info) in enumerate(aggregated_deps.items(), 1):
             dep_start = time.time()
             logger.info(f"[{i}/{total_deps}] Analyzing {dep_info['ecosystem']}:{dep_info['name']}...")
@@ -239,6 +276,10 @@ def main():
                     )
                     depsdev_elapsed = time.time() - depsdev_start
                     timing_stats['depsdev_api'] += depsdev_elapsed
+                    if depsdev_metrics and depsdev_metrics.get('data_available'):
+                        success_stats['depsdev_success'] += 1
+                    else:
+                        success_stats['depsdev_failed'] += 1
                     logger.debug(f"  deps.dev: {depsdev_metrics.get('dependent_count', 0)} dependents ({depsdev_elapsed:.2f}s)")
 
                     # Extract GitHub repo from deps.dev links if not already found
@@ -265,9 +306,13 @@ def main():
                     github_elapsed = time.time() - github_start
                     timing_stats['github_api'] += github_elapsed
                     if github_metrics:
+                        success_stats['github_success'] += 1
                         logger.debug(f"  GitHub: {github_metrics.get('stars', 0)} stars, "
                                    f"{github_metrics.get('contributors', 0)} contributors ({github_elapsed:.2f}s)")
+                    else:
+                        success_stats['github_failed'] += 1
                 except Exception as e:
+                    success_stats['github_failed'] += 1
                     logger.warning(f"  Could not fetch GitHub metrics for {github_repo}: {type(e).__name__}: {e}")
 
             # Calculate SPOF score
@@ -289,6 +334,16 @@ def main():
             except Exception as e:
                 logger.error(f"  Failed to score dependency: {e}")
 
+            # Print progress summary every 50 dependencies
+            if i % 50 == 0:
+                gh_total = success_stats['github_success'] + success_stats['github_failed']
+                gh_rate = (success_stats['github_success'] / gh_total * 100) if gh_total > 0 else 0
+                dd_total = success_stats['depsdev_success'] + success_stats['depsdev_failed']
+                dd_rate = (success_stats['depsdev_success'] / dd_total * 100) if dd_total > 0 else 0
+                logger.info(f"  Progress: {i}/{total_deps} ({i/total_deps*100:.0f}%) | "
+                          f"GitHub: {success_stats['github_success']}/{gh_total} ({gh_rate:.0f}%) | "
+                          f"deps.dev: {success_stats['depsdev_success']}/{dd_total} ({dd_rate:.0f}%)")
+
         # Normalize scores for better distribution
         logger.info("\nNormalizing scores for better distribution...")
         scored_dependencies = scorer.normalize_dependency_scores(scored_dependencies)
@@ -306,6 +361,12 @@ def main():
         logger.info(f"  └─ deps.dev API: {timing_stats['depsdev_api']:.1f}s")
         logger.info(f"  └─ GitHub API: {timing_stats['github_api']:.1f}s")
         logger.info(f"  └─ Scoring: {timing_stats['scoring']:.1f}s")
+        logger.info(f"")
+        logger.info(f"Data Source Success Rates:")
+        gh_total = success_stats['github_success'] + success_stats['github_failed']
+        dd_total = success_stats['depsdev_success'] + success_stats['depsdev_failed']
+        logger.info(f"  GitHub API: {success_stats['github_success']}/{gh_total} successful ({success_stats['github_success']/gh_total*100:.0f}%)")
+        logger.info(f"  deps.dev API: {success_stats['depsdev_success']}/{dd_total} successful ({success_stats['depsdev_success']/dd_total*100:.0f}%)")
         logger.info(f"")
         logger.info(f"Averages:")
         logger.info(f"  {phase2_time/len(top_repos):.1f}s per repository (SBOM generation)")
