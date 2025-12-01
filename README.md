@@ -51,13 +51,15 @@ git clone https://github.com/yourusername/spof.git
 cd spof
 ```
 
-### 3. Install Python dependencies
+### 3. Install the package
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
 ```
+
+This installs the `spof` command and all dependencies.
 
 ### 4. Set up configuration
 
@@ -121,28 +123,28 @@ Weights must sum to 1.0.
 ### Basic analysis with organization name
 
 ```bash
-python -m src.main <org-name>
+spof <org-name>
 ```
 
 Example:
 ```bash
-python -m src.main kubernetes
+spof kubernetes
 ```
 
 ### With additional options
 
 ```bash
 # Analyze with debug logging
-python -m src.main kubernetes --debug
+spof kubernetes --debug
 
 # Limit to 5 repos
-python -m src.main kubernetes --max-repos 5
+spof kubernetes --max-repos 5
 
 # Generate CSV export
-python -m src.main kubernetes --output-csv
+spof kubernetes --output-csv
 
 # Combine multiple options
-python -m src.main kubernetes --max-repos 10 --debug --output-csv
+spof kubernetes --max-repos 10 --debug --output-csv
 ```
 
 ### Using config file only
@@ -150,13 +152,13 @@ python -m src.main kubernetes --max-repos 10 --debug --output-csv
 If you prefer to set the organization in `config.yaml`, you can run without arguments:
 
 ```bash
-python -m src.main
+spof
 ```
 
 ### Custom configuration file
 
 ```bash
-python -m src.main kubernetes --config my-config.yaml
+spof kubernetes --config my-config.yaml
 ```
 
 ## Output

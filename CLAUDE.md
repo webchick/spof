@@ -17,8 +17,8 @@ Target users: OSPOs, DevRel teams, Marketing teams, Engineering leadership
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install package and dependencies (creates 'spof' command)
+pip install -e .
 
 # Install Syft (required for SBOM generation)
 brew install syft  # macOS
@@ -30,21 +30,24 @@ curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -
 
 ```bash
 # Basic analysis (specify org via command line)
-python -m src.main <org-name>
+spof <org-name>
 
 # With additional options
-python -m src.main kubernetes --debug
-python -m src.main kubernetes --max-repos 5
-python -m src.main kubernetes --output-csv
+spof kubernetes --debug
+spof kubernetes --max-repos 5
+spof kubernetes --output-csv
 
 # Combine multiple options
-python -m src.main kubernetes --max-repos 10 --debug --output-csv
+spof kubernetes --max-repos 10 --debug --output-csv
 
 # Custom config file
-python -m src.main kubernetes --config my-config.yaml
+spof kubernetes --config my-config.yaml
 
 # Use config.yaml for org (if not specified via CLI)
-python -m src.main
+spof
+
+# Alternative (without installing): Use Python module directly
+python -m src.main kubernetes
 ```
 
 ### Configuration
