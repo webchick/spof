@@ -15,6 +15,7 @@ from .sbom_generator import SBOMGenerator
 from .depsdev_client import DepsDevClient
 from .scorer import SPOFScorer
 from .output import OutputFormatter
+from .cache import Cache
 
 
 # Configure logging
@@ -60,6 +61,16 @@ def main():
         action='store_true',
         help='Also generate CSV export'
     )
+    parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Disable caching of API responses'
+    )
+    parser.add_argument(
+        '--clear-cache',
+        action='store_true',
+        help='Clear all cached data before running'
+    )
 
     args = parser.parse_args()
 
@@ -91,9 +102,21 @@ def main():
         logger.info(f"Analyzing organization: {config.github_org}")
         logger.info(f"Max repositories: {config.max_repos}")
 
+        # Initialize cache
+        cache = Cache()
+        if args.clear_cache:
+            logger.info("Clearing cache...")
+            cache.clear()
+        if args.no_cache:
+            logger.info("Cache disabled")
+            cache.disable()
+        else:
+            stats = cache.get_stats()
+            logger.info(f"Cache: {stats['files']} files, {stats['size_mb']:.2f} MB")
+
         # Initialize clients
         logger.info("Initializing GitHub client...")
-        github_client = GitHubClient(config.github_token)
+        github_client = GitHubClient(config.github_token, cache=cache)
 
         logger.info("Initializing SBOM generator...")
         sbom_generator = SBOMGenerator(
@@ -102,7 +125,7 @@ def main():
         )
 
         logger.info("Initializing deps.dev client...")
-        depsdev_client = DepsDevClient()
+        depsdev_client = DepsDevClient(cache=cache)
 
         logger.info("Initializing scorer...")
         scorer = SPOFScorer(config.scoring_weights)

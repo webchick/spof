@@ -7,6 +7,8 @@ from typing import List, Dict, Any, Optional
 from github import Github, Repository, GithubException
 from dataclasses import dataclass
 
+from .cache import Cache
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,17 @@ class RepoInfo:
 class GitHubClient:
     """GitHub API client with repository fetching and ranking."""
 
-    def __init__(self, token: str):
+    def __init__(self, token: str, cache: Optional[Cache] = None):
         """
         Initialize GitHub client.
 
         Args:
             token: GitHub personal access token
+            cache: Optional cache instance
         """
         self.github = Github(token)
         self.user = self.github.get_user()
+        self.cache = cache or Cache()
         logger.info(f"Authenticated as GitHub user: {self.user.login}")
 
     def get_top_repos(self, org_name: str, max_repos: int = 20) -> List[RepoInfo]:
@@ -110,7 +114,7 @@ class GitHubClient:
 
     def get_repo_metrics(self, full_name: str) -> Dict[str, Any]:
         """
-        Get detailed metrics for a repository.
+        Get detailed metrics for a repository (with caching).
 
         Args:
             full_name: Full repository name (e.g., "owner/repo")
@@ -121,6 +125,13 @@ class GitHubClient:
         Raises:
             GithubException: If repository not found or access denied
         """
+        # Check cache first
+        cache_key = f"github_repo_metrics:{full_name}"
+        cached_metrics = self.cache.get(cache_key)
+        if cached_metrics:
+            logger.debug(f"Using cached metrics for {full_name}")
+            return cached_metrics
+
         logger.debug(f"Fetching metrics for repository: {full_name}")
 
         try:
@@ -187,6 +198,10 @@ class GitHubClient:
             }
 
             logger.debug(f"  Metrics for {full_name}: {metrics}")
+
+            # Cache the metrics
+            self.cache.set(cache_key, metrics)
+
             return metrics
 
         except GithubException as e:

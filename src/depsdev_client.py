@@ -8,6 +8,8 @@ import requests
 from typing import Dict, Any, Optional
 from urllib.parse import quote
 
+from .cache import Cache
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +19,18 @@ class DepsDevClient:
 
     BASE_URL = "https://api.deps.dev/v3alpha"
 
-    def __init__(self):
-        """Initialize deps.dev API client."""
+    def __init__(self, cache: Optional[Cache] = None):
+        """
+        Initialize deps.dev API client.
+
+        Args:
+            cache: Optional cache instance
+        """
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'SPOF-Analysis-Tool/0.1.0'
         })
+        self.cache = cache or Cache()
 
     def get_package_info(self, ecosystem: str, package_name: str) -> Optional[Dict[str, Any]]:
         """
@@ -135,7 +143,7 @@ class DepsDevClient:
 
     def get_package_metrics(self, ecosystem: str, package_name: str) -> Dict[str, Any]:
         """
-        Extract key metrics from package information.
+        Extract key metrics from package information (with caching).
 
         Args:
             ecosystem: Package ecosystem
@@ -144,6 +152,13 @@ class DepsDevClient:
         Returns:
             Dict with extracted metrics
         """
+        # Check cache first
+        cache_key = f"depsdev_metrics:{ecosystem}:{package_name}"
+        cached_metrics = self.cache.get(cache_key)
+        if cached_metrics:
+            logger.debug(f"Using cached metrics for {ecosystem}:{package_name}")
+            return cached_metrics
+
         metrics = {
             'dependent_count': 0,
             'dependent_repo_count': 0,
@@ -182,6 +197,9 @@ class DepsDevClient:
         logger.debug(f"Extracted metrics for {ecosystem}:{package_name}: "
                     f"dependents={metrics['dependent_count']}, "
                     f"advisories={metrics['advisory_count']}")
+
+        # Cache the metrics
+        self.cache.set(cache_key, metrics)
 
         return metrics
 

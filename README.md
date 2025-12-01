@@ -143,9 +143,24 @@ spof kubernetes --max-repos 5
 # Generate CSV export
 spof kubernetes --output-csv
 
+# Disable caching (always fetch fresh data)
+spof kubernetes --no-cache
+
+# Clear cache before running
+spof kubernetes --clear-cache
+
 # Combine multiple options
 spof kubernetes --max-repos 10 --debug --output-csv
 ```
+
+### Caching
+
+The tool automatically caches API responses for 24 hours to:
+- **Reduce API calls** and avoid rate limits
+- **Speed up repeated analyses** (10x+ faster on cache hits)
+- **Save your GitHub API quota** (5,000 requests/hour limit)
+
+Cache is stored in `.cache/` directory. Use `--no-cache` to bypass or `--clear-cache` to reset.
 
 ### Using config file only
 
