@@ -184,11 +184,12 @@ def main():
         for i, (dep_key, dep_info) in enumerate(aggregated_deps.items(), 1):
             logger.info(f"[{i}/{total_deps}] Analyzing {dep_info['ecosystem']}:{dep_info['name']}...")
 
-            # Collect GitHub metrics (if available via search)
+            # Collect GitHub metrics (if available)
             github_metrics = None
+            github_repo = None
             if 'github' in config.enabled_data_sources:
                 try:
-                    # For Go modules, extract GitHub repo from module path
+                    # Strategy 1: For Go modules, extract GitHub repo from module path
                     if dep_info['ecosystem'].lower() in ['go', 'golang']:
                         module_path = dep_info['name']
                         # Go modules often have paths like: github.com/owner/repo or github.com/owner/repo/v2
@@ -197,11 +198,13 @@ def main():
                             parts = module_path.replace('github.com/', '').split('/')
                             if len(parts) >= 2:
                                 # Take first two parts (owner/repo), ignore subpaths and version suffixes
-                                repo_full_name = f"{parts[0]}/{parts[1]}"
-                                logger.debug(f"  Extracted GitHub repo: {repo_full_name}")
-                                github_metrics = github_client.get_repo_metrics(repo_full_name)
+                                github_repo = f"{parts[0]}/{parts[1]}"
+
+                    # Strategy 2: Extract GitHub repo from deps.dev links (for all ecosystems)
+                    # This will be populated after we fetch deps.dev metrics below
+
                 except Exception as e:
-                    logger.debug(f"  Could not fetch GitHub metrics: {e}")
+                    logger.debug(f"  Could not extract GitHub repo: {e}")
 
             # Collect deps.dev metrics
             depsdev_metrics = None
@@ -218,8 +221,32 @@ def main():
                         version
                     )
                     logger.debug(f"  deps.dev: {depsdev_metrics.get('dependent_count', 0)} dependents")
+
+                    # Extract GitHub repo from deps.dev links if not already found
+                    if not github_repo and depsdev_metrics and depsdev_metrics.get('links'):
+                        repo_url = depsdev_metrics['links'].get('repository', '')
+                        if 'github.com' in repo_url:
+                            # Extract owner/repo from GitHub URL
+                            # URLs like: https://github.com/owner/repo or https://github.com/owner/repo.git
+                            import re
+                            match = re.search(r'github\.com[:/]([^/]+)/([^/.]+)', repo_url)
+                            if match:
+                                github_repo = f"{match.group(1)}/{match.group(2)}"
+                                logger.debug(f"  Extracted GitHub repo from deps.dev: {github_repo}")
+
                 except Exception as e:
                     logger.warning(f"  Failed to fetch deps.dev data: {e}")
+
+            # Fetch GitHub metrics if we found a repo
+            if github_repo and 'github' in config.enabled_data_sources and not github_metrics:
+                try:
+                    logger.debug(f"  Fetching GitHub metrics for: {github_repo}")
+                    github_metrics = github_client.get_repo_metrics(github_repo)
+                    if github_metrics:
+                        logger.debug(f"  GitHub: {github_metrics.get('stars', 0)} stars, "
+                                   f"{github_metrics.get('contributors', 0)} contributors")
+                except Exception as e:
+                    logger.debug(f"  Could not fetch GitHub metrics: {e}")
 
             # Calculate SPOF score
             try:
