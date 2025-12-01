@@ -1,2 +1,322 @@
-# spof
-A utility to determine the criticality of OSS projects (and in turn, their criticality to the OSS ecosystem)
+# SPOF - Single Point of Failure Analysis Tool
+
+A utility to analyze OSS dependencies for GitHub organizations and calculate SPOF (Single Point of Failure) scores to guide open source investment decisions.
+
+## Overview
+
+SPOF helps OSPOs, DevRel teams, and Marketing teams understand which open source projects are most critical to their organization and where to invest resources for maximum impact.
+
+The tool:
+1. Fetches the most popular repositories from a GitHub organization
+2. Generates Software Bill of Materials (SBOMs) for each repository
+3. Analyzes dependencies using multiple data sources (GitHub API, deps.dev)
+4. Calculates SPOF scores based on configurable weights
+5. Generates actionable recommendations for OSS investment
+
+## Features
+
+- **Automated dependency discovery** using Syft for multi-language support
+- **Configurable scoring weights** to match your organization's priorities
+- **Multiple data sources** for comprehensive analysis (GitHub, deps.dev)
+- **JSON and CSV exports** for further analysis
+- **Actionable recommendations** prioritized by impact
+
+## Installation
+
+### Prerequisites
+
+- Python 3.8+
+- Git
+- Syft (for SBOM generation)
+- GitHub Personal Access Token
+
+### 1. Install Syft
+
+macOS:
+```bash
+brew install syft
+```
+
+Linux:
+```bash
+curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+```
+
+For other installation methods, see: https://github.com/anchore/syft
+
+### 2. Clone the repository
+
+```bash
+git clone https://github.com/yourusername/spof.git
+cd spof
+```
+
+### 3. Install Python dependencies
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 4. Set up configuration
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your GitHub Personal Access Token:
+```
+GITHUB_TOKEN=your_github_token_here
+```
+
+To create a GitHub token:
+1. Go to https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Select scopes: `public_repo` (or `repo` for private repos)
+4. Copy the token to your `.env` file
+
+## Configuration
+
+Edit `config.yaml` to customize your analysis:
+
+```yaml
+github:
+  org: "your-org-name"        # GitHub organization to analyze
+  token: "${GITHUB_TOKEN}"    # Reference to environment variable
+  max_repos: 20               # Number of top repos to analyze
+
+scoring:
+  weights:
+    internal_criticality: 0.30  # How critical to your org
+    ecosystem_popularity: 0.25  # Broader ecosystem usage
+    maintainer_risk: 0.20       # Maintenance SPOF risk
+    security_health: 0.15       # Security posture
+    upstream_activity: 0.10     # Active maintenance
+
+data_sources:
+  enabled:
+    - github
+    - depsdev
+
+output:
+  format: json
+  file: "spof_analysis_{org}_{date}.json"
+  directory: "output"
+```
+
+### Adjusting Scoring Weights
+
+Customize the scoring weights to match your organization's priorities:
+
+- **High internal focus**: Increase `internal_criticality` weight
+- **Security-conscious**: Increase `security_health` weight
+- **Sustainability focus**: Increase `maintainer_risk` and `upstream_activity` weights
+- **Popular projects**: Increase `ecosystem_popularity` weight
+
+Weights must sum to 1.0.
+
+## Usage
+
+### Basic analysis with organization name
+
+```bash
+python -m src.main <org-name>
+```
+
+Example:
+```bash
+python -m src.main kubernetes
+```
+
+### With additional options
+
+```bash
+# Analyze with debug logging
+python -m src.main kubernetes --debug
+
+# Limit to 5 repos
+python -m src.main kubernetes --max-repos 5
+
+# Generate CSV export
+python -m src.main kubernetes --output-csv
+
+# Combine multiple options
+python -m src.main kubernetes --max-repos 10 --debug --output-csv
+```
+
+### Using config file only
+
+If you prefer to set the organization in `config.yaml`, you can run without arguments:
+
+```bash
+python -m src.main
+```
+
+### Custom configuration file
+
+```bash
+python -m src.main kubernetes --config my-config.yaml
+```
+
+## Output
+
+### JSON Report
+
+The tool generates a comprehensive JSON report with:
+
+```json
+{
+  "organization": "example-org",
+  "analysis_date": "2025-11-30T...",
+  "config": {
+    "repos_analyzed": 15,
+    "scoring_weights": { ... }
+  },
+  "summary": {
+    "total_dependencies": 234,
+    "critical_dependencies": 8,
+    "high_priority": 15
+  },
+  "dependencies": [
+    {
+      "name": "requests",
+      "ecosystem": "PyPI",
+      "spof_score": 85.3,
+      "confidence": 0.92,
+      "metrics": {
+        "internal_criticality": 90,
+        "ecosystem_popularity": 95,
+        "maintainer_risk": 60,
+        "security_health": 88,
+        "upstream_activity": 92
+      },
+      "usage": {
+        "repos_using": ["repo1", "repo2"],
+        "usage_count": 14
+      },
+      "recommendation": "CRITICAL - Monitor closely..."
+    }
+  ],
+  "recommendations": [...]
+}
+```
+
+### Console Output
+
+The tool prints an executive summary to the console:
+
+```
+============================================================
+SPOF Analysis Report: example-org
+============================================================
+
+Analysis Date: 2025-11-30...
+Repositories Analyzed: 15
+
+Total Dependencies: 234
+  Critical (≥80):  8
+  High (60-79):    15
+  Medium (40-59):  42
+  Low (20-39):     89
+  Minimal (<20):   80
+
+🚨 Top Critical Dependencies:
+  1. requests (PyPI)
+     Score: 85.3 | CRITICAL - Monitor closely...
+  2. numpy (PyPI)
+     Score: 82.1 | CRITICAL - High internal usage...
+```
+
+## Understanding SPOF Scores
+
+SPOF scores range from 0-100, where higher scores indicate higher priority for investment:
+
+- **80-100 (CRITICAL)**: Immediate attention - high organizational impact
+- **60-79 (HIGH)**: Significant dependencies requiring monitoring
+- **40-59 (MEDIUM)**: Moderate impact - periodic review
+- **20-39 (LOW)**: Limited impact - standard monitoring
+- **0-19 (MINIMAL)**: Healthy projects or low impact
+
+### Score Components
+
+1. **Internal Criticality (default 30%)**: How many of your repos depend on it
+2. **Ecosystem Popularity (default 25%)**: Broader ecosystem usage and adoption
+3. **Maintainer Risk (default 20%)**: Single points of failure in maintenance
+4. **Security Health (default 15%)**: Known vulnerabilities and security posture
+5. **Upstream Activity (default 10%)**: Active maintenance indicators
+
+## Architecture
+
+```
+SPOF Analysis Pipeline:
+
+1. GitHub Repository Fetching
+   ↓ (Ranked by stars + 2×forks)
+2. SBOM Generation (Syft)
+   ↓ (Multi-language dependency extraction)
+3. Data Collection
+   ├─ GitHub API (stars, contributors, activity)
+   └─ deps.dev API (popularity, dependents, vulnerabilities)
+   ↓
+4. SPOF Score Calculation
+   ↓ (Configurable weighted metrics)
+5. Report Generation
+   └─ JSON / CSV exports
+```
+
+## Troubleshooting
+
+### "GitHub token not provided"
+
+Make sure you've created a `.env` file with your `GITHUB_TOKEN`. See Installation step 4.
+
+### "Syft not found"
+
+Install Syft using the instructions in Installation step 1.
+
+### "Rate limit exceeded"
+
+GitHub API has rate limits (5,000 requests/hour for authenticated users). If analyzing large organizations:
+- Reduce `max_repos` in config.yaml
+- Wait for rate limit to reset
+- Consider using a GitHub App token for higher limits
+
+### "No dependencies found"
+
+Some repositories may not have recognizable dependency files. This is normal for:
+- Documentation-only repos
+- Repos without standard dependency manifests
+- Archived or empty repos
+
+## Roadmap
+
+### Phase 2 Features (Planned)
+- Google Sheets export with formatted dashboards
+- Additional data sources (libraries.io, OpenSSF BigQuery, package registries)
+- Caching layer for API responses
+- Async/parallel processing for large organizations
+- Checkpoint/resume capability
+- Web-based dashboard
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+## License
+
+Apache License 2.0 - See LICENSE file for details.
+
+## Target Audience
+
+- **OSPOs (Open Source Program Offices)**: Identify critical dependencies for investment and risk management
+- **DevRel Teams**: Understand which projects to engage with and support
+- **Engineering Leadership**: Make data-driven decisions about OSS strategy
+- **Security Teams**: Identify high-risk dependencies requiring attention
+
+## Acknowledgments
+
+This tool leverages excellent open source projects:
+- [Syft](https://github.com/anchore/syft) for SBOM generation
+- [deps.dev](https://deps.dev) for dependency insights
+- [PyGithub](https://github.com/PyGithub/PyGithub) for GitHub API access

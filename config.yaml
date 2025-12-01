@@ -1,0 +1,50 @@
+# SPOF Analysis Tool Configuration
+
+github:
+  # GitHub organization to analyze
+  org: "example-org"
+
+  # GitHub Personal Access Token (can use ${GITHUB_TOKEN} to reference environment variable)
+  token: "${GITHUB_TOKEN}"
+
+  # Maximum number of repositories to analyze (top N by weighted score)
+  max_repos: 20
+
+scoring:
+  # Configurable weights for SPOF score calculation
+  # All weights should sum to 1.0
+  weights:
+    internal_criticality: 0.30  # How critical to your org (0-1)
+    ecosystem_popularity: 0.25  # Broader ecosystem usage (0-1)
+    maintainer_risk: 0.20       # Maintenance SPOF risk (0-1)
+    security_health: 0.15       # Security posture (0-1)
+    upstream_activity: 0.10     # Active maintenance (0-1)
+
+data_sources:
+  # Which data sources to enable for analysis
+  enabled:
+    - github      # GitHub API metrics (stars, forks, contributors)
+    - depsdev     # deps.dev API (popularity, dependents, vulnerabilities)
+
+  # Future data sources (Phase 2):
+  # - librariesio
+  # - openssf
+  # - package_registries
+
+output:
+  # Output format: json (Google Sheets support in Phase 2)
+  format: json
+
+  # Output file path (supports template variables: {org}, {date})
+  file: "spof_analysis_{org}_{date}.json"
+
+  # Directory for output files
+  directory: "output"
+
+# Syft configuration
+syft:
+  # Path to syft binary (leave empty to use system PATH)
+  path: ""
+
+  # SBOM output format
+  format: "cyclonedx-json"
