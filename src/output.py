@@ -132,8 +132,9 @@ class OutputFormatter:
                 'priority': 'critical',
                 'count': len(critical),
                 'dependencies': [d.name for d in critical[:5]],  # Top 5
-                'action': 'Immediate attention required - high organizational impact with maintenance or security concerns. '
-                         'Consider contributing, sponsoring, or forking these projects.'
+                'action': 'Top investment priorities - these dependencies are critical to your organization and/or '
+                         'the broader ecosystem. Consider: direct sponsorship, hiring maintainers, contributing code, '
+                         'or establishing ongoing support relationships.'
             })
 
         if high:
@@ -141,8 +142,9 @@ class OutputFormatter:
                 'priority': 'high',
                 'count': len(high),
                 'dependencies': [d.name for d in high[:5]],  # Top 5
-                'action': 'Significant dependencies requiring attention. Monitor for updates, security issues, and '
-                         'consider investing in their long-term sustainability.'
+                'action': 'Strong investment candidates - significant organizational or ecosystem dependencies. '
+                         'Consider: sponsorship programs, contributor time allocation, or participation in '
+                         'governance/foundation support.'
             })
 
         if medium:
@@ -150,7 +152,8 @@ class OutputFormatter:
                 'priority': 'medium',
                 'count': len(medium),
                 'dependencies': [d.name for d in medium[:5]],  # Top 5
-                'action': 'Moderate impact dependencies. Establish monitoring processes and periodic reviews.'
+                'action': 'Moderate priority for investment. Consider: community sponsorship programs, one-time '
+                         'contributions, or tracking for future support as usage grows.'
             })
 
         return recommendations
@@ -207,10 +210,23 @@ class OutputFormatter:
         print(f"  Low (20-39):     {summary['low_priority']}")
         print(f"  Minimal (<20):   {summary['minimal_priority']}")
 
-        # Print top critical dependencies
+        # Print dependencies critical to BOTH org and ecosystem
+        dual_critical = [
+            d for d in report['dependencies']
+            if d['spof_score'] >= 80
+            and d['metrics']['internal_criticality'] >= 70
+            and d['metrics']['ecosystem_popularity'] >= 70
+        ]
+        if dual_critical:
+            print(f"\n⭐ Critical to BOTH Your Org & Ecosystem:")
+            for i, dep in enumerate(dual_critical[:5], 1):
+                print(f"  {i}. {dep['name']} ({dep['ecosystem']})")
+                print(f"     Score: {dep['spof_score']:.1f} | Internal: {dep['metrics']['internal_criticality']:.0f} | Ecosystem: {dep['metrics']['ecosystem_popularity']:.0f}")
+
+        # Print top critical dependencies by category
         critical_deps = [d for d in report['dependencies'] if d['spof_score'] >= 80]
-        if critical_deps:
-            print(f"\n🚨 Top Critical Dependencies:")
+        if critical_deps and not dual_critical:
+            print(f"\n🎯 Top Investment Priorities:")
             for i, dep in enumerate(critical_deps[:5], 1):
                 print(f"  {i}. {dep['name']} ({dep['ecosystem']})")
                 print(f"     Score: {dep['spof_score']:.1f} | {dep['recommendation']}")

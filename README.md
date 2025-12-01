@@ -223,29 +223,44 @@ Total Dependencies: 234
   Low (20-39):     89
   Minimal (<20):   80
 
-🚨 Top Critical Dependencies:
+⭐ Critical to BOTH Your Org & Ecosystem:
   1. requests (PyPI)
-     Score: 85.3 | CRITICAL - Monitor closely...
+     Score: 85.3 | Internal: 90 | Ecosystem: 95
   2. numpy (PyPI)
-     Score: 82.1 | CRITICAL - High internal usage...
+     Score: 82.1 | Internal: 85 | Ecosystem: 88
+
+📋 Recommendations:
+
+  [CRITICAL] 8 dependencies
+  Top investment priorities - these dependencies are critical to your
+  organization and/or the broader ecosystem. Consider: direct sponsorship,
+  hiring maintainers, contributing code, or establishing ongoing support
+  relationships.
 ```
 
 ## Understanding SPOF Scores
 
-SPOF scores range from 0-100, where higher scores indicate higher priority for investment:
+SPOF scores range from 0-100, where higher scores indicate higher priority for OSS investment:
 
-- **80-100 (CRITICAL)**: Immediate attention - high organizational impact
-- **60-79 (HIGH)**: Significant dependencies requiring monitoring
-- **40-59 (MEDIUM)**: Moderate impact - periodic review
-- **20-39 (LOW)**: Limited impact - standard monitoring
-- **0-19 (MINIMAL)**: Healthy projects or low impact
+- **80-100 (CRITICAL)**: Top investment priorities - essential dependencies
+- **60-79 (HIGH)**: Strong candidates for sponsorship and contribution
+- **40-59 (MEDIUM)**: Moderate priority - consider community support programs
+- **20-39 (LOW)**: Limited impact - may benefit from ecosystem-wide initiatives
+- **0-19 (MINIMAL)**: Well-supported or low organizational impact
+
+### Investment Focus Areas
+
+The tool specifically highlights:
+- **Dual-critical dependencies**: Projects critical to BOTH your organization and the broader ecosystem (highest ROI)
+- **Organization-critical**: Core dependencies your team relies on heavily
+- **Ecosystem-critical**: Widely-used projects that benefit the entire community
 
 ### Score Components
 
 1. **Internal Criticality (default 30%)**: How many of your repos depend on it
 2. **Ecosystem Popularity (default 25%)**: Broader ecosystem usage and adoption
 3. **Maintainer Risk (default 20%)**: Single points of failure in maintenance
-4. **Security Health (default 15%)**: Known vulnerabilities and security posture
+4. **Security Health (default 15%)**: Known vulnerabilities (one factor among many)
 5. **Upstream Activity (default 10%)**: Active maintenance indicators
 
 ## Architecture
@@ -311,10 +326,10 @@ Apache License 2.0 - See LICENSE file for details.
 
 ## Target Audience
 
-- **OSPOs (Open Source Program Offices)**: Identify critical dependencies for investment and risk management
-- **DevRel Teams**: Understand which projects to engage with and support
-- **Engineering Leadership**: Make data-driven decisions about OSS strategy
-- **Security Teams**: Identify high-risk dependencies requiring attention
+- **OSPOs (Open Source Program Offices)**: Identify strategic investment opportunities that maximize organizational and ecosystem impact
+- **DevRel Teams**: Understand which projects to engage with, contribute to, and build relationships with
+- **Engineering Leadership**: Make data-driven decisions about OSS sponsorship, contribution priorities, and strategic partnerships
+- **Marketing Teams**: Understand ecosystem dependencies to align community engagement and sponsorship programs
 
 ## Acknowledgments
 

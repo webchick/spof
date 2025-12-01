@@ -394,7 +394,7 @@ class SPOFScorer:
         maintainer_risk: float
     ) -> str:
         """
-        Generate actionable recommendation based on scores.
+        Generate actionable investment recommendation based on scores.
 
         Args:
             spof_score: Overall SPOF score
@@ -406,30 +406,41 @@ class SPOFScorer:
             Recommendation string
         """
         if spof_score >= 80:
-            # Critical
-            if maintainer_risk > 70:
-                return "CRITICAL - High internal usage with maintenance concerns. Consider contributing or sponsoring."
+            # Critical - high investment priority
+            if internal_crit > 70 and ecosystem_pop > 70:
+                return "CRITICAL - Essential to both your org and the ecosystem. Top priority for sponsorship and contribution."
+            elif internal_crit > 70:
+                return "CRITICAL - Core dependency for your organization. Strong candidate for dedicated support or maintainer sponsorship."
+            elif ecosystem_pop > 70:
+                return "CRITICAL - Widely-used ecosystem dependency. Consider contributing to ensure long-term sustainability."
             else:
-                return "CRITICAL - Monitor closely, very high impact to organization."
+                return "CRITICAL - High-impact dependency requiring attention."
 
         elif spof_score >= 60:
             # High priority
-            if internal_crit > 70:
-                return "HIGH - Significant internal dependency. Monitor for updates and security issues."
+            if internal_crit > 70 and ecosystem_pop > 50:
+                return "HIGH - Important to your org and used broadly. Good investment opportunity for dual impact."
+            elif internal_crit > 70:
+                return "HIGH - Significant internal dependency. Consider engaging with maintainers or contributing."
+            elif ecosystem_pop > 70:
+                return "HIGH - Ecosystem-critical project. Sponsorship would benefit the broader community."
             else:
-                return "HIGH - Consider investment to ensure long-term sustainability."
+                return "HIGH - Worthwhile investment candidate. Evaluate maintainer needs and engagement opportunities."
 
         elif spof_score >= 40:
             # Medium priority
-            return "MEDIUM - Moderate impact. Monitor periodically."
+            if internal_crit > 50:
+                return "MEDIUM - Moderate internal usage. Track for future investment as usage grows."
+            else:
+                return "MEDIUM - Consider for community sponsorship programs or pooled funding initiatives."
 
         elif spof_score >= 20:
             # Low priority
-            return "LOW - Limited impact. Standard monitoring sufficient."
+            return "LOW - Limited organizational impact. May benefit from ecosystem-wide funding initiatives."
 
         else:
             # Minimal priority
             if ecosystem_pop > 80:
-                return "MINIMAL - Healthy, well-maintained project."
+                return "MINIMAL - Well-supported, healthy project with strong community."
             else:
-                return "MINIMAL - Low impact to organization."
+                return "MINIMAL - Low priority for direct investment."
