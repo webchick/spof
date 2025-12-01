@@ -344,10 +344,26 @@ Some repositories may not have recognizable dependency files. This is normal for
 ### Phase 2 Features (Planned)
 - Google Sheets export with formatted dashboards
 - Additional data sources (libraries.io, OpenSSF BigQuery, package registries)
-- Caching layer for API responses
-- Async/parallel processing for large organizations
-- Checkpoint/resume capability
-- Web-based dashboard
+- GitHub metrics for upstream packages (last commit, releases, contributors)
+- Web-based dashboard for visualization
+- Customizable recommendation templates
+
+### Phase 3 Features (Temporal Integration)
+- **Durable workflow execution** using [Temporal](https://temporal.io/)
+- **Async/parallel processing** - Analyze multiple repos and dependencies concurrently
+- **Checkpoint/resume capability** - Pause and resume long-running analyses
+- **Automatic retry logic** - Handle API rate limits and transient failures gracefully
+- **Scheduled analyses** - Periodic SPOF analysis for tracking changes over time
+- **Progress monitoring** - Real-time visibility into analysis progress
+- **Workflow versioning** - Update analysis logic without breaking in-flight runs
+- **Signal handling** - Dynamically adjust running analyses (e.g., add more repos)
+
+Benefits of Temporal integration:
+- Analyze organizations with 100+ repos without timeouts or manual intervention
+- Gracefully handle GitHub API rate limits with built-in backoff
+- Resume from exact checkpoint if process crashes or is interrupted
+- Run analyses on a schedule to track dependency health over time
+- Scale horizontally by adding more workers
 
 ## Contributing
 
