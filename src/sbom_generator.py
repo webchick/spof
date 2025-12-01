@@ -8,7 +8,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+
+from .cache import Cache
 
 
 logger = logging.getLogger(__name__)
@@ -27,20 +29,22 @@ class Dependency:
 class SBOMGenerator:
     """Generate and parse SBOMs using Syft."""
 
-    def __init__(self, syft_path: str = "", syft_format: str = "cyclonedx-json"):
+    def __init__(self, syft_path: str = "", syft_format: str = "cyclonedx-json", cache: Optional[Cache] = None):
         """
         Initialize SBOM generator.
 
         Args:
             syft_path: Path to syft binary (empty string uses system PATH)
             syft_format: Output format for Syft (default: cyclonedx-json)
+            cache: Optional cache instance
         """
         self.syft_cmd = syft_path if syft_path else "syft"
         self.syft_format = syft_format
+        self.cache = cache or Cache()
 
     def generate_sbom_for_repo(self, repo_url: str, repo_name: str) -> List[Dependency]:
         """
-        Generate SBOM for a GitHub repository.
+        Generate SBOM for a GitHub repository (with caching).
 
         Args:
             repo_url: Git clone URL for the repository
@@ -53,6 +57,14 @@ class SBOMGenerator:
             subprocess.CalledProcessError: If Syft execution fails
             ValueError: If SBOM parsing fails
         """
+        # Check cache first
+        cache_key = f"sbom:{repo_name}"
+        cached_deps = self.cache.get(cache_key)
+        if cached_deps:
+            logger.info(f"Using cached SBOM for repository: {repo_name}")
+            # Convert dicts back to Dependency objects
+            return [Dependency(**dep) for dep in cached_deps]
+
         logger.info(f"Generating SBOM for repository: {repo_name}")
 
         # Create temporary directory for cloning
@@ -80,6 +92,10 @@ class SBOMGenerator:
             dependencies = self._parse_cyclonedx(sbom_data, repo_name)
 
             logger.info(f"Found {len(dependencies)} dependencies in {repo_name}")
+
+            # Cache the dependencies (convert to dicts for JSON serialization)
+            self.cache.set(cache_key, [asdict(dep) for dep in dependencies])
+
             return dependencies
 
     def _run_syft(self, target_path: str, repo_name: str) -> Dict[str, Any]:

@@ -121,7 +121,8 @@ def main():
         logger.info("Initializing SBOM generator...")
         sbom_generator = SBOMGenerator(
             syft_path=config.syft_path,
-            syft_format=config.syft_format
+            syft_format=config.syft_format,
+            cache=cache
         )
 
         logger.info("Initializing deps.dev client...")
