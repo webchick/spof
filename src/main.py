@@ -188,10 +188,18 @@ def main():
             github_metrics = None
             if 'github' in config.enabled_data_sources:
                 try:
-                    # Try to get GitHub repo metrics if the package has a GitHub link
-                    # For MVP, we'll skip this for non-GitHub packages
-                    # In Phase 2, we can enhance this with better linking
-                    pass
+                    # For Go modules, extract GitHub repo from module path
+                    if dep_info['ecosystem'].lower() in ['go', 'golang']:
+                        module_path = dep_info['name']
+                        # Go modules often have paths like: github.com/owner/repo or github.com/owner/repo/v2
+                        if module_path.startswith('github.com/'):
+                            # Extract owner/repo from path
+                            parts = module_path.replace('github.com/', '').split('/')
+                            if len(parts) >= 2:
+                                # Take first two parts (owner/repo), ignore subpaths and version suffixes
+                                repo_full_name = f"{parts[0]}/{parts[1]}"
+                                logger.debug(f"  Extracted GitHub repo: {repo_full_name}")
+                                github_metrics = github_client.get_repo_metrics(repo_full_name)
                 except Exception as e:
                     logger.debug(f"  Could not fetch GitHub metrics: {e}")
 
