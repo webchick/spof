@@ -141,19 +141,65 @@ class DepsDevClient:
             logger.warning(f"Failed to fetch deps.dev version data: {e}")
             return None
 
-    def get_package_metrics(self, ecosystem: str, package_name: str) -> Dict[str, Any]:
+    def get_dependents_info(self, ecosystem: str, package_name: str, version: str) -> Optional[Dict[str, Any]]:
+        """
+        Get dependent counts for a specific package version.
+
+        Args:
+            ecosystem: Package ecosystem
+            package_name: Package name
+            version: Package version
+
+        Returns:
+            Dependents information dict, or None if not found
+        """
+        system_map = {
+            'npm': 'NPM',
+            'pypi': 'PyPI',
+            'maven': 'Maven',
+            'cargo': 'Cargo',
+            'go': 'Go',
+        }
+
+        system = system_map.get(ecosystem.lower(), ecosystem.upper())
+        encoded_name = quote(package_name, safe='')
+        encoded_version = quote(version, safe='')
+
+        url = f"{self.BASE_URL}/systems/{system}/packages/{encoded_name}/versions/{encoded_version}:dependents"
+
+        logger.debug(f"Fetching dependents for {system}:{package_name}@{version}")
+
+        try:
+            response = self.session.get(url, timeout=10)
+
+            if response.status_code == 404:
+                logger.debug(f"Dependents not found: {system}:{package_name}@{version}")
+                return None
+            elif response.status_code != 200:
+                logger.warning(f"deps.dev API error for dependents: Status {response.status_code}")
+                return None
+
+            data = response.json()
+            return data
+
+        except requests.RequestException as e:
+            logger.warning(f"Failed to fetch dependents data: {e}")
+            return None
+
+    def get_package_metrics(self, ecosystem: str, package_name: str, version: Optional[str] = None) -> Dict[str, Any]:
         """
         Extract key metrics from package information (with caching).
 
         Args:
             ecosystem: Package ecosystem
             package_name: Package name
+            version: Optional package version (if not provided, tries to find default version)
 
         Returns:
             Dict with extracted metrics
         """
         # Check cache first
-        cache_key = f"depsdev_metrics:{ecosystem}:{package_name}"
+        cache_key = f"depsdev_metrics:{ecosystem}:{package_name}:{version}"
         cached_metrics = self.cache.get(cache_key)
         if cached_metrics:
             logger.debug(f"Using cached metrics for {ecosystem}:{package_name}")
@@ -170,29 +216,57 @@ class DepsDevClient:
 
         package_info = self.get_package_info(ecosystem, package_name)
         if not package_info:
+            logger.debug(f"No package info returned for {ecosystem}:{package_name}")
+            self.cache.set(cache_key, metrics)
             return metrics
 
         metrics['data_available'] = True
 
-        # Extract dependent counts
-        if 'version' in package_info:
-            version_data = package_info['version']
-            metrics['dependent_count'] = version_data.get('dependentCount', 0)
-            metrics['dependent_repo_count'] = version_data.get('dependentRepoCount', 0)
+        # Find a version to query (use provided version or find default/latest)
+        query_version = version
+        if not query_version and 'versions' in package_info:
+            versions = package_info['versions']
+            # Find default version or use the latest
+            for v in versions:
+                if v.get('isDefault'):
+                    query_version = v['versionKey']['version']
+                    break
+            # If no default, use the last version in the list (usually latest)
+            if not query_version and versions:
+                query_version = versions[-1]['versionKey']['version']
 
-        # Extract advisories (vulnerabilities)
-        advisories = package_info.get('advisories', [])
-        metrics['advisory_count'] = len(advisories)
-        metrics['has_vulnerabilities'] = len(advisories) > 0
+        # Get dependent counts from :dependents endpoint
+        if query_version:
+            dependents_info = self.get_dependents_info(ecosystem, package_name, query_version)
+            if dependents_info:
+                metrics['dependent_count'] = dependents_info.get('dependentCount', 0)
+                # Note: API returns dependentCount (total) and directDependentCount
+                # We'll use the total count for popularity
+                logger.debug(f"Found {metrics['dependent_count']} dependents for {ecosystem}:{package_name}@{query_version}")
 
-        # Extract links (repository, homepage, etc.)
-        if 'version' in package_info and 'links' in package_info['version']:
-            links = package_info['version']['links']
-            metrics['links'] = {
-                'repository': links.get('repo', ''),
-                'homepage': links.get('homepage', ''),
-                'documentation': links.get('documentation', ''),
-            }
+        # Get version-specific info for advisories and links
+        if query_version:
+            version_info = self.get_version_info(ecosystem, package_name, query_version)
+            if version_info:
+                # Extract advisories
+                advisory_keys = version_info.get('advisoryKeys', [])
+                metrics['advisory_count'] = len(advisory_keys)
+                metrics['has_vulnerabilities'] = len(advisory_keys) > 0
+
+                # Extract links
+                links = version_info.get('links', [])
+                if links:
+                    link_dict = {}
+                    for link in links:
+                        label = link.get('label', '')
+                        url = link.get('url', '')
+                        if label == 'SOURCE_REPO':
+                            link_dict['repository'] = url
+                        elif label == 'HOMEPAGE':
+                            link_dict['homepage'] = url
+                        elif label == 'DOCUMENTATION':
+                            link_dict['documentation'] = url
+                    metrics['links'] = link_dict
 
         logger.debug(f"Extracted metrics for {ecosystem}:{package_name}: "
                     f"dependents={metrics['dependent_count']}, "

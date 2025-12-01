@@ -219,26 +219,29 @@ class OutputFormatter:
         if critical_deps:
             print(f"\n🔴 CRITICAL (Top 3 of {len(critical_deps)}):")
             for i, dep in enumerate(critical_deps[:3], 1):
-                internal = dep['metrics']['internal_criticality']
-                ecosystem = dep['metrics']['ecosystem_popularity']
+                m = dep['metrics']
                 print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
-                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
+                print(f"     Internal: {m['internal_criticality']:.0f} | Ecosystem: {m['ecosystem_popularity']:.0f} | "
+                      f"Maintainer: {m['maintainer_risk']:.0f} | Security: {m['security_health']:.0f} | "
+                      f"Activity: {m['upstream_activity']:.0f}")
 
         if high_deps:
             print(f"\n🟡 HIGH PRIORITY (Top 3 of {len(high_deps)}):")
             for i, dep in enumerate(high_deps[:3], 1):
-                internal = dep['metrics']['internal_criticality']
-                ecosystem = dep['metrics']['ecosystem_popularity']
+                m = dep['metrics']
                 print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
-                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
+                print(f"     Internal: {m['internal_criticality']:.0f} | Ecosystem: {m['ecosystem_popularity']:.0f} | "
+                      f"Maintainer: {m['maintainer_risk']:.0f} | Security: {m['security_health']:.0f} | "
+                      f"Activity: {m['upstream_activity']:.0f}")
 
         if medium_deps:
             print(f"\n🟢 MEDIUM PRIORITY (Top 3 of {len(medium_deps)}):")
             for i, dep in enumerate(medium_deps[:3], 1):
-                internal = dep['metrics']['internal_criticality']
-                ecosystem = dep['metrics']['ecosystem_popularity']
+                m = dep['metrics']
                 print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
-                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
+                print(f"     Internal: {m['internal_criticality']:.0f} | Ecosystem: {m['ecosystem_popularity']:.0f} | "
+                      f"Maintainer: {m['maintainer_risk']:.0f} | Security: {m['security_health']:.0f} | "
+                      f"Activity: {m['upstream_activity']:.0f}")
 
         # Print recommendations
         if report['recommendations']:

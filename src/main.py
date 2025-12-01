@@ -199,9 +199,15 @@ def main():
             depsdev_metrics = None
             if 'depsdev' in config.enabled_data_sources:
                 try:
+                    # Pick a version to query (use first version found in our SBOM)
+                    version = None
+                    if dep_info.get('versions'):
+                        version = list(dep_info['versions'])[0]
+
                     depsdev_metrics = depsdev_client.get_package_metrics(
                         dep_info['ecosystem'],
-                        dep_info['normalized_name']
+                        dep_info['normalized_name'],
+                        version
                     )
                     logger.debug(f"  deps.dev: {depsdev_metrics.get('dependent_count', 0)} dependents")
                 except Exception as e:
