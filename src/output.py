@@ -210,26 +210,35 @@ class OutputFormatter:
         print(f"  Low (20-39):     {summary['low_priority']}")
         print(f"  Minimal (<20):   {summary['minimal_priority']}")
 
-        # Print dependencies critical to BOTH org and ecosystem
-        dual_critical = [
-            d for d in report['dependencies']
-            if d['spof_score'] >= 80
-            and d['metrics']['internal_criticality'] >= 70
-            and d['metrics']['ecosystem_popularity'] >= 70
-        ]
-        if dual_critical:
-            print(f"\n⭐ Critical to BOTH Your Org & Ecosystem:")
-            for i, dep in enumerate(dual_critical[:5], 1):
-                print(f"  {i}. {dep['name']} ({dep['ecosystem']})")
-                print(f"     Score: {dep['spof_score']:.1f} | Internal: {dep['metrics']['internal_criticality']:.0f} | Ecosystem: {dep['metrics']['ecosystem_popularity']:.0f}")
-
-        # Print top critical dependencies by category
+        # Categorize dependencies
         critical_deps = [d for d in report['dependencies'] if d['spof_score'] >= 80]
-        if critical_deps and not dual_critical:
-            print(f"\n🎯 Top Investment Priorities:")
-            for i, dep in enumerate(critical_deps[:5], 1):
-                print(f"  {i}. {dep['name']} ({dep['ecosystem']})")
-                print(f"     Score: {dep['spof_score']:.1f} | {dep['recommendation']}")
+        high_deps = [d for d in report['dependencies'] if 60 <= d['spof_score'] < 80]
+        medium_deps = [d for d in report['dependencies'] if 40 <= d['spof_score'] < 60]
+
+        # Print top 3 in each major category
+        if critical_deps:
+            print(f"\n🔴 CRITICAL (Top 3 of {len(critical_deps)}):")
+            for i, dep in enumerate(critical_deps[:3], 1):
+                internal = dep['metrics']['internal_criticality']
+                ecosystem = dep['metrics']['ecosystem_popularity']
+                print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
+                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
+
+        if high_deps:
+            print(f"\n🟡 HIGH PRIORITY (Top 3 of {len(high_deps)}):")
+            for i, dep in enumerate(high_deps[:3], 1):
+                internal = dep['metrics']['internal_criticality']
+                ecosystem = dep['metrics']['ecosystem_popularity']
+                print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
+                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
+
+        if medium_deps:
+            print(f"\n🟢 MEDIUM PRIORITY (Top 3 of {len(medium_deps)}):")
+            for i, dep in enumerate(medium_deps[:3], 1):
+                internal = dep['metrics']['internal_criticality']
+                ecosystem = dep['metrics']['ecosystem_popularity']
+                print(f"  {i}. {dep['name']} ({dep['ecosystem']}) - Score: {dep['spof_score']:.1f}")
+                print(f"     Internal: {internal:.0f} | Ecosystem: {ecosystem:.0f}")
 
         # Print recommendations
         if report['recommendations']:

@@ -225,24 +225,42 @@ The tool prints an executive summary to the console:
 
 ```
 ============================================================
-SPOF Analysis Report: example-org
+SPOF Analysis Report: kubernetes
 ============================================================
 
-Analysis Date: 2025-11-30...
-Repositories Analyzed: 15
+Analysis Date: 2025-12-01...
+Repositories Analyzed: 20
 
-Total Dependencies: 234
+Total Dependencies: 1,234
   Critical (≥80):  8
-  High (60-79):    15
-  Medium (40-59):  42
-  Low (20-39):     89
-  Minimal (<20):   80
+  High (60-79):    45
+  Medium (40-59):  183
+  Low (20-39):     847
+  Minimal (<20):   151
 
-⭐ Critical to BOTH Your Org & Ecosystem:
-  1. requests (PyPI)
-     Score: 85.3 | Internal: 90 | Ecosystem: 95
-  2. numpy (PyPI)
-     Score: 82.1 | Internal: 85 | Ecosystem: 88
+🔴 CRITICAL (Top 3 of 8):
+  1. go (Go) - Score: 94.2
+     Internal: 95 | Ecosystem: 98
+  2. kubernetes/client-go (Go) - Score: 91.5
+     Internal: 88 | Ecosystem: 92
+  3. etcd (Go) - Score: 87.3
+     Internal: 90 | Ecosystem: 85
+
+🟡 HIGH PRIORITY (Top 3 of 45):
+  1. prometheus/client_golang (Go) - Score: 76.8
+     Internal: 75 | Ecosystem: 80
+  2. grpc-go (Go) - Score: 74.2
+     Internal: 70 | Ecosystem: 85
+  3. cobra (Go) - Score: 71.5
+     Internal: 65 | Ecosystem: 78
+
+🟢 MEDIUM PRIORITY (Top 3 of 183):
+  1. logrus (Go) - Score: 58.3
+     Internal: 55 | Ecosystem: 65
+  2. yaml.v3 (Go) - Score: 56.7
+     Internal: 60 | Ecosystem: 58
+  3. crypto (Go) - Score: 54.1
+     Internal: 50 | Ecosystem: 62
 
 📋 Recommendations:
 
