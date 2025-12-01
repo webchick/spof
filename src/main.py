@@ -268,7 +268,7 @@ def main():
                         logger.debug(f"  GitHub: {github_metrics.get('stars', 0)} stars, "
                                    f"{github_metrics.get('contributors', 0)} contributors ({github_elapsed:.2f}s)")
                 except Exception as e:
-                    logger.debug(f"  Could not fetch GitHub metrics: {e}")
+                    logger.warning(f"  Could not fetch GitHub metrics for {github_repo}: {type(e).__name__}: {e}")
 
             # Calculate SPOF score
             try:
