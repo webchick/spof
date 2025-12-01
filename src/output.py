@@ -189,18 +189,30 @@ class OutputFormatter:
 
         return output_path
 
-    def print_summary(self, report: Dict[str, Any]):
+    def print_summary(self, report: Dict[str, Any], github_success_rate: float = None, depsdev_success_rate: float = None):
         """
         Print executive summary to console.
 
         Args:
             report: Report dictionary
+            github_success_rate: Optional GitHub API success rate (0-100)
+            depsdev_success_rate: Optional deps.dev API success rate (0-100)
         """
         print("\n" + "="*60)
         print(f"SPOF Analysis Report: {report['organization']}")
         print("="*60)
         print(f"\nAnalysis Date: {report['analysis_date']}")
         print(f"Repositories Analyzed: {report['config']['repos_analyzed']}")
+
+        # Show data source health if provided
+        if github_success_rate is not None or depsdev_success_rate is not None:
+            print(f"\nData Source Health:")
+            if github_success_rate is not None:
+                emoji = "✓" if github_success_rate >= 50 else "⚠"
+                print(f"  {emoji} GitHub API: {github_success_rate:.0f}% successful")
+            if depsdev_success_rate is not None:
+                emoji = "✓" if depsdev_success_rate >= 50 else "⚠"
+                print(f"  {emoji} deps.dev API: {depsdev_success_rate:.0f}% successful")
 
         summary = report['summary']
         print(f"\nTotal Dependencies: {summary['total_dependencies']}")

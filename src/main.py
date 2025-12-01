@@ -142,30 +142,51 @@ def main():
         logger.info(f"\n{'='*60}")
         logger.info("Testing Data Sources")
         logger.info(f"{'='*60}")
+        print(f"\n{'='*60}")
+        print("Testing Data Sources")
+        print(f"{'='*60}")
 
         # Test GitHub API
         if 'github' in config.enabled_data_sources:
             try:
                 test_repo = github_client.get_repo_metrics("kubernetes/kubernetes")
                 if test_repo and test_repo.get('stars', 0) > 0:
-                    logger.info(f"✓ GitHub API: Working (test repo has {test_repo['stars']} stars)")
+                    msg = f"✓ GitHub API: Working (test repo has {test_repo['stars']} stars)"
+                    logger.info(msg)
+                    print(msg)
                 else:
-                    logger.warning(f"⚠ GitHub API: Returned data but no stars")
+                    msg = f"⚠ GitHub API: Returned data but no stars"
+                    logger.warning(msg)
+                    print(msg)
             except Exception as e:
-                logger.error(f"✗ GitHub API: Failed - {type(e).__name__}: {e}")
-                logger.warning(f"  Analysis will continue but GitHub metrics will be unavailable")
+                msg1 = f"✗ GitHub API: Failed - {type(e).__name__}: {e}"
+                msg2 = f"  Analysis will continue but GitHub metrics will be unavailable"
+                logger.error(msg1)
+                logger.warning(msg2)
+                print(msg1)
+                print(msg2)
 
         # Test deps.dev API
         if 'depsdev' in config.enabled_data_sources:
             try:
                 test_pkg = depsdev_client.get_package_metrics("pypi", "requests", "2.31.0")
                 if test_pkg and test_pkg.get('data_available'):
-                    logger.info(f"✓ deps.dev API: Working")
+                    msg = f"✓ deps.dev API: Working"
+                    logger.info(msg)
+                    print(msg)
                 else:
-                    logger.warning(f"⚠ deps.dev API: Returned data but no dependents")
+                    msg = f"⚠ deps.dev API: Returned data but no dependents"
+                    logger.warning(msg)
+                    print(msg)
             except Exception as e:
-                logger.error(f"✗ deps.dev API: Failed - {type(e).__name__}: {e}")
-                logger.warning(f"  Analysis will continue but deps.dev metrics will be unavailable")
+                msg1 = f"✗ deps.dev API: Failed - {type(e).__name__}: {e}"
+                msg2 = f"  Analysis will continue but deps.dev metrics will be unavailable"
+                logger.error(msg1)
+                logger.warning(msg2)
+                print(msg1)
+                print(msg2)
+
+        print("")  # Blank line before next phase
 
         # Phase 1: Fetch top repositories
         logger.info(f"\n{'='*60}")
@@ -397,7 +418,11 @@ def main():
             logger.info(f"CSV export saved: {csv_path}")
 
         # Print summary to console
-        output_formatter.print_summary(report)
+        gh_total = success_stats['github_success'] + success_stats['github_failed']
+        dd_total = success_stats['depsdev_success'] + success_stats['depsdev_failed']
+        gh_rate = (success_stats['github_success'] / gh_total * 100) if gh_total > 0 else None
+        dd_rate = (success_stats['depsdev_success'] / dd_total * 100) if dd_total > 0 else None
+        output_formatter.print_summary(report, github_success_rate=gh_rate, depsdev_success_rate=dd_rate)
 
         logger.info("Analysis complete! ✓")
 
