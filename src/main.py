@@ -143,7 +143,9 @@ def main():
         logger.info("Phase 1: Fetching top repositories")
         logger.info(f"{'='*60}")
 
+        phase1_start = time.time()
         top_repos = github_client.get_top_repos(config.github_org, config.max_repos)
+        phase1_time = time.time() - phase1_start
 
         if not top_repos:
             logger.error("No repositories found. Exiting.")
@@ -156,6 +158,7 @@ def main():
         logger.info("Phase 2: Generating SBOMs and collecting dependencies")
         logger.info(f"{'='*60}")
 
+        phase2_start = time.time()
         repo_dependencies = {}
         for i, repo in enumerate(top_repos, 1):
             logger.info(f"[{i}/{len(top_repos)}] Processing {repo.name}...")
@@ -173,6 +176,7 @@ def main():
         # Aggregate dependencies across repos
         logger.info("\nAggregating dependencies across repositories...")
         aggregated_deps = sbom_generator.aggregate_dependencies(repo_dependencies)
+        phase2_time = time.time() - phase2_start
 
         # Phase 3: Collect ecosystem data
         logger.info(f"\n{'='*60}")
@@ -290,14 +294,22 @@ def main():
         scored_dependencies = scorer.normalize_dependency_scores(scored_dependencies)
 
         # Print timing summary
+        total_time = phase1_time + phase2_time + timing_stats['total']
         logger.info(f"\n{'='*60}")
         logger.info("Performance Summary")
         logger.info(f"{'='*60}")
-        logger.info(f"Total analysis time: {timing_stats['total']:.1f}s")
-        logger.info(f"  deps.dev API calls: {timing_stats['depsdev_api']:.1f}s ({timing_stats['depsdev_api']/timing_stats['total']*100:.0f}%)")
-        logger.info(f"  GitHub API calls: {timing_stats['github_api']:.1f}s ({timing_stats['github_api']/timing_stats['total']*100:.0f}%)")
-        logger.info(f"  Scoring calculations: {timing_stats['scoring']:.1f}s ({timing_stats['scoring']/timing_stats['total']*100:.0f}%)")
-        logger.info(f"Average time per dependency: {timing_stats['total']/total_deps:.2f}s")
+        logger.info(f"Total pipeline time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+        logger.info(f"")
+        logger.info(f"Phase 1 - Fetch repositories: {phase1_time:.1f}s ({phase1_time/total_time*100:.0f}%)")
+        logger.info(f"Phase 2 - Generate SBOMs: {phase2_time:.1f}s ({phase2_time/total_time*100:.0f}%)")
+        logger.info(f"Phase 3 - Analyze dependencies: {timing_stats['total']:.1f}s ({timing_stats['total']/total_time*100:.0f}%)")
+        logger.info(f"  └─ deps.dev API: {timing_stats['depsdev_api']:.1f}s")
+        logger.info(f"  └─ GitHub API: {timing_stats['github_api']:.1f}s")
+        logger.info(f"  └─ Scoring: {timing_stats['scoring']:.1f}s")
+        logger.info(f"")
+        logger.info(f"Averages:")
+        logger.info(f"  {phase2_time/len(top_repos):.1f}s per repository (SBOM generation)")
+        logger.info(f"  {timing_stats['total']/total_deps:.2f}s per dependency (analysis)")
 
         # Phase 4: Generate report
         logger.info(f"\n{'='*60}")
