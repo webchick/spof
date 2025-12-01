@@ -202,6 +202,7 @@ def main():
                     # Strategy 1: For Go modules, extract GitHub repo from module path
                     if dep_info['ecosystem'].lower() in ['go', 'golang']:
                         module_path = dep_info['name']
+                        logger.debug(f"  Go module detected: {module_path}")
                         # Go modules often have paths like: github.com/owner/repo or github.com/owner/repo/v2
                         if module_path.startswith('github.com/'):
                             # Extract owner/repo from path
@@ -209,6 +210,7 @@ def main():
                             if len(parts) >= 2:
                                 # Take first two parts (owner/repo), ignore subpaths and version suffixes
                                 github_repo = f"{parts[0]}/{parts[1]}"
+                                logger.debug(f"  Extracted GitHub repo from Go module: {github_repo}")
 
                     # Strategy 2: Extract GitHub repo from deps.dev links (for all ecosystems)
                     # This will be populated after we fetch deps.dev metrics below
