@@ -141,8 +141,8 @@ class GitHubClient:
             try:
                 contributors = repo.get_contributors()
                 contributor_count = contributors.totalCount
-            except GithubException:
-                logger.warning(f"Could not fetch contributors for {full_name}")
+            except (GithubException, AssertionError, AttributeError) as e:
+                logger.debug(f"Could not fetch contributors for {full_name}: {e}")
                 contributor_count = 0
 
             # Get recent commit activity (last 90 days)
@@ -150,23 +150,30 @@ class GitHubClient:
                 commits = repo.get_commits(since=None)  # Will limit in scoring
                 # Note: We'll count commits in scorer.py to avoid rate limits
                 recent_commits_available = True
-            except GithubException:
-                logger.warning(f"Could not fetch commits for {full_name}")
+            except (GithubException, AssertionError, AttributeError) as e:
+                logger.debug(f"Could not fetch commits for {full_name}: {e}")
                 recent_commits_available = False
 
             # Get issue stats
-            open_issues = repo.open_issues_count
+            try:
+                open_issues = repo.open_issues_count
+            except (AttributeError, AssertionError) as e:
+                logger.debug(f"Could not fetch issue count for {full_name}: {e}")
+                open_issues = 0
 
             # Get last release date
             try:
                 releases = repo.get_releases()
                 if releases.totalCount > 0:
                     latest_release = releases[0]
-                    last_release_date = latest_release.created_at
+                    if latest_release and hasattr(latest_release, 'created_at'):
+                        last_release_date = latest_release.created_at
+                    else:
+                        last_release_date = None
                 else:
                     last_release_date = None
-            except GithubException:
-                logger.warning(f"Could not fetch releases for {full_name}")
+            except (GithubException, AssertionError, AttributeError) as e:
+                logger.debug(f"Could not fetch releases for {full_name}: {e}")
                 last_release_date = None
 
             # Get last commit date
@@ -186,20 +193,24 @@ class GitHubClient:
                 last_commit_date = None
 
             # Check for organization backing
-            has_org_backing = repo.organization is not None
+            try:
+                has_org_backing = repo.organization is not None
+            except (AttributeError, AssertionError):
+                has_org_backing = False
 
+            # Build metrics dict with safe access
             metrics = {
-                'stars': repo.stargazers_count,
-                'forks': repo.forks_count,
-                'watchers': repo.watchers_count,
+                'stars': getattr(repo, 'stargazers_count', 0),
+                'forks': getattr(repo, 'forks_count', 0),
+                'watchers': getattr(repo, 'watchers_count', 0),
                 'contributors': contributor_count,
                 'open_issues': open_issues,
                 'last_release_date': last_release_date.isoformat() if last_release_date else None,
                 'last_commit_date': last_commit_date.isoformat() if last_commit_date else None,
                 'has_org_backing': has_org_backing,
-                'language': repo.language,
-                'created_at': repo.created_at.isoformat(),
-                'updated_at': repo.updated_at.isoformat(),
+                'language': getattr(repo, 'language', None),
+                'created_at': repo.created_at.isoformat() if hasattr(repo, 'created_at') and repo.created_at else None,
+                'updated_at': repo.updated_at.isoformat() if hasattr(repo, 'updated_at') and repo.updated_at else None,
             }
 
             logger.debug(f"  Metrics for {full_name}: {metrics}")
