@@ -173,11 +173,16 @@ class GitHubClient:
             try:
                 commits = repo.get_commits()
                 if commits.totalCount > 0:
-                    last_commit_date = commits[0].commit.author.date
+                    commit = commits[0]
+                    # Handle cases where author might be None
+                    if commit and commit.commit and commit.commit.author:
+                        last_commit_date = commit.commit.author.date
+                    else:
+                        last_commit_date = None
                 else:
                     last_commit_date = None
-            except GithubException:
-                logger.warning(f"Could not fetch last commit for {full_name}")
+            except (GithubException, AssertionError, AttributeError) as e:
+                logger.warning(f"Could not fetch last commit for {full_name}: {e}")
                 last_commit_date = None
 
             # Check for organization backing
