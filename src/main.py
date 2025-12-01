@@ -220,6 +220,10 @@ def main():
             except Exception as e:
                 logger.error(f"  Failed to score dependency: {e}")
 
+        # Normalize scores for better distribution
+        logger.info("\nNormalizing scores for better distribution...")
+        scored_dependencies = scorer.normalize_dependency_scores(scored_dependencies)
+
         # Phase 4: Generate report
         logger.info(f"\n{'='*60}")
         logger.info("Phase 4: Generating report")

@@ -28,15 +28,17 @@ class ScoredDependency:
 class SPOFScorer:
     """Calculate SPOF scores for dependencies."""
 
-    def __init__(self, weights: Dict[str, float]):
+    def __init__(self, weights: Dict[str, float], normalize_scores: bool = True):
         """
         Initialize scorer with configurable weights.
 
         Args:
             weights: Dict with keys: internal_criticality, ecosystem_popularity,
                     maintainer_risk, security_health, upstream_activity
+            normalize_scores: Apply score normalization for better distribution
         """
         self.weights = weights
+        self.normalize_scores = normalize_scores
         self._validate_weights()
 
     def _validate_weights(self):
@@ -444,3 +446,70 @@ class SPOFScorer:
                 return "MINIMAL - Well-supported, healthy project with strong community."
             else:
                 return "MINIMAL - Low priority for direct investment."
+
+    def normalize_dependency_scores(self, dependencies: List[ScoredDependency]) -> List[ScoredDependency]:
+        """
+        Normalize scores to create better distribution.
+
+        This ensures the top dependencies always score near 100, while maintaining
+        relative differences. Creates a better spread across Critical/High/Medium/Low
+        categories.
+
+        Args:
+            dependencies: List of scored dependencies
+
+        Returns:
+            List with normalized scores
+        """
+        if not dependencies or not self.normalize_scores:
+            return dependencies
+
+        # Find the maximum raw score
+        max_score = max(dep.spof_score for dep in dependencies)
+
+        if max_score == 0:
+            return dependencies
+
+        # Calculate scaling factor to push top score toward 95-100
+        # We don't want to push all the way to 100 unless it's truly perfect
+        target_max = 95.0
+        scale_factor = target_max / max_score if max_score < target_max else 1.0
+
+        logger.info(f"Normalizing scores: max_score={max_score:.1f}, scale_factor={scale_factor:.2f}")
+
+        # Apply scaling to all dependencies
+        normalized = []
+        for dep in dependencies:
+            # Scale the overall score
+            new_score = min(100, dep.spof_score * scale_factor)
+
+            # Also scale individual metrics proportionally
+            scaled_metrics = {
+                key: min(100, value * scale_factor)
+                for key, value in dep.metrics.items()
+            }
+
+            # Create new scored dependency with normalized values
+            normalized_dep = ScoredDependency(
+                name=dep.name,
+                ecosystem=dep.ecosystem,
+                spof_score=new_score,
+                confidence=dep.confidence,
+                metrics=scaled_metrics,
+                raw_data=dep.raw_data,
+                recommendation=self._generate_recommendation(
+                    new_score,
+                    scaled_metrics['internal_criticality'],
+                    scaled_metrics['ecosystem_popularity'],
+                    scaled_metrics['maintainer_risk']
+                )
+            )
+            normalized.append(normalized_dep)
+
+        # Log distribution after normalization
+        critical = sum(1 for d in normalized if d.spof_score >= 80)
+        high = sum(1 for d in normalized if 60 <= d.spof_score < 80)
+        medium = sum(1 for d in normalized if 40 <= d.spof_score < 60)
+        logger.info(f"After normalization: Critical={critical}, High={high}, Medium={medium}")
+
+        return normalized
