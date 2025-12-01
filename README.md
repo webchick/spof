@@ -18,6 +18,9 @@ The tool:
 - **Automated dependency discovery** using Syft for multi-language support
 - **Configurable scoring weights** to match your organization's priorities
 - **Multiple data sources** for comprehensive analysis (GitHub, deps.dev)
+- **GitHub metrics extraction** for upstream packages (stars, activity, contributors)
+- **File-based caching** with 24-hour TTL to optimize API usage
+- **Score normalization** for meaningful priority distribution
 - **JSON and CSV exports** for further analysis
 - **Actionable recommendations** prioritized by impact
 
@@ -344,9 +347,10 @@ Some repositories may not have recognizable dependency files. This is normal for
 ### Phase 2 Features (Planned)
 - Google Sheets export with formatted dashboards
 - Additional data sources (libraries.io, OpenSSF BigQuery, package registries)
-- GitHub metrics for upstream packages (last commit, releases, contributors)
+- Enhanced GitHub metrics for non-GitHub-hosted packages via deps.dev links
 - Web-based dashboard for visualization
 - Customizable recommendation templates
+- Historical tracking to identify trending risks
 
 ### Phase 3 Features (Temporal Integration)
 - **Durable workflow execution** using [Temporal](https://temporal.io/)
