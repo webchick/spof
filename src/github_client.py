@@ -135,7 +135,13 @@ class GitHubClient:
         logger.debug(f"Fetching metrics for repository: {full_name}")
 
         try:
-            repo = self.github.get_repo(full_name)
+            # Get repository - this can raise AssertionError from PyGithub
+            try:
+                repo = self.github.get_repo(full_name)
+            except AssertionError as e:
+                logger.error(f"PyGithub AssertionError getting repo {full_name}: {e}")
+                logger.error(f"This is a known PyGithub issue. Skipping this repo.")
+                return None
 
             # Get contributor count
             try:
