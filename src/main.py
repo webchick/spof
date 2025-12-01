@@ -7,6 +7,7 @@ Analyzes OSS dependencies for GitHub organizations to guide investment decisions
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 from .config import Config
@@ -181,7 +182,16 @@ def main():
         scored_dependencies = []
         total_deps = len(aggregated_deps)
 
+        # Timing stats
+        timing_stats = {
+            'github_api': 0,
+            'depsdev_api': 0,
+            'scoring': 0,
+            'total': 0
+        }
+
         for i, (dep_key, dep_info) in enumerate(aggregated_deps.items(), 1):
+            dep_start = time.time()
             logger.info(f"[{i}/{total_deps}] Analyzing {dep_info['ecosystem']}:{dep_info['name']}...")
 
             # Collect GitHub metrics (if available)
@@ -210,6 +220,7 @@ def main():
             depsdev_metrics = None
             if 'depsdev' in config.enabled_data_sources:
                 try:
+                    depsdev_start = time.time()
                     # Pick a version to query (use first version found in our SBOM)
                     version = None
                     if dep_info.get('versions'):
@@ -220,7 +231,9 @@ def main():
                         dep_info['normalized_name'],
                         version
                     )
-                    logger.debug(f"  deps.dev: {depsdev_metrics.get('dependent_count', 0)} dependents")
+                    depsdev_elapsed = time.time() - depsdev_start
+                    timing_stats['depsdev_api'] += depsdev_elapsed
+                    logger.debug(f"  deps.dev: {depsdev_metrics.get('dependent_count', 0)} dependents ({depsdev_elapsed:.2f}s)")
 
                     # Extract GitHub repo from deps.dev links if not already found
                     if not github_repo and depsdev_metrics and depsdev_metrics.get('links'):
@@ -240,30 +253,49 @@ def main():
             # Fetch GitHub metrics if we found a repo
             if github_repo and 'github' in config.enabled_data_sources and not github_metrics:
                 try:
+                    github_start = time.time()
                     logger.debug(f"  Fetching GitHub metrics for: {github_repo}")
                     github_metrics = github_client.get_repo_metrics(github_repo)
+                    github_elapsed = time.time() - github_start
+                    timing_stats['github_api'] += github_elapsed
                     if github_metrics:
                         logger.debug(f"  GitHub: {github_metrics.get('stars', 0)} stars, "
-                                   f"{github_metrics.get('contributors', 0)} contributors")
+                                   f"{github_metrics.get('contributors', 0)} contributors ({github_elapsed:.2f}s)")
                 except Exception as e:
                     logger.debug(f"  Could not fetch GitHub metrics: {e}")
 
             # Calculate SPOF score
             try:
+                score_start = time.time()
                 scored_dep = scorer.score_dependency(
                     dep_info,
                     github_metrics=github_metrics,
                     depsdev_metrics=depsdev_metrics,
                     total_repos_analyzed=len(top_repos)
                 )
+                score_elapsed = time.time() - score_start
+                timing_stats['scoring'] += score_elapsed
                 scored_dependencies.append(scored_dep)
-                logger.info(f"  SPOF Score: {scored_dep.spof_score:.1f} (confidence: {scored_dep.confidence:.2f})")
+
+                dep_elapsed = time.time() - dep_start
+                timing_stats['total'] += dep_elapsed
+                logger.info(f"  SPOF Score: {scored_dep.spof_score:.1f} (confidence: {scored_dep.confidence:.2f}) [{dep_elapsed:.2f}s]")
             except Exception as e:
                 logger.error(f"  Failed to score dependency: {e}")
 
         # Normalize scores for better distribution
         logger.info("\nNormalizing scores for better distribution...")
         scored_dependencies = scorer.normalize_dependency_scores(scored_dependencies)
+
+        # Print timing summary
+        logger.info(f"\n{'='*60}")
+        logger.info("Performance Summary")
+        logger.info(f"{'='*60}")
+        logger.info(f"Total analysis time: {timing_stats['total']:.1f}s")
+        logger.info(f"  deps.dev API calls: {timing_stats['depsdev_api']:.1f}s ({timing_stats['depsdev_api']/timing_stats['total']*100:.0f}%)")
+        logger.info(f"  GitHub API calls: {timing_stats['github_api']:.1f}s ({timing_stats['github_api']/timing_stats['total']*100:.0f}%)")
+        logger.info(f"  Scoring calculations: {timing_stats['scoring']:.1f}s ({timing_stats['scoring']/timing_stats['total']*100:.0f}%)")
+        logger.info(f"Average time per dependency: {timing_stats['total']/total_deps:.2f}s")
 
         # Phase 4: Generate report
         logger.info(f"\n{'='*60}")
