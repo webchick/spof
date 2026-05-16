@@ -22,6 +22,7 @@ The architecture is optimized for:
 - explainable risk scoring rather than black-box prediction
 - agent-assisted evidence gathering with deterministic scoring stages
 - interactive single-company analysis
+- Temporal-based orchestration for long-running and failure-prone work
 - future expansion into private artifact ingestion and investment planning
 
 ## 2. System Goal
@@ -53,7 +54,8 @@ The MVP can be implemented as five logical layers:
    - auth and user/session handling
 
 2. `Orchestration Layer`
-   - analysis job coordinator
+   - Temporal workflows
+   - Temporal activities
    - agent task routing
    - workflow state management
 
@@ -82,18 +84,35 @@ This is the most pragmatic first stack:
 
 - Frontend: `Next.js`
 - Backend/API: `Next.js route handlers` or a separate `FastAPI` service
-- Worker/orchestration: `Python` worker service
+- Worker/orchestration: `Python` Temporal workers
 - Database: `PostgreSQL`
-- Queue: `Redis` with a lightweight job system such as `RQ`, `BullMQ`, or `Celery`
+- Workflow engine: `Temporal`
 - Search/index: PostgreSQL full-text first, dedicated vector store later only if needed
 - Object storage: S3-compatible bucket for raw reports and exports
 - LLM provider: one primary model provider with structured-output support
 
 Why this split:
 
-- Python is a better fit for enrichment pipelines, scraping normalization, and scoring logic.
+- Python is a better fit for enrichment pipelines, scraping normalization, scoring logic, and Temporal workers.
 - Next.js gives a fast path for shipping an analyst-facing app.
 - PostgreSQL is sufficient for the MVP if the schema is designed well.
+- Temporal is a better fit than a basic queue because the analysis pipeline is long-running, retry-heavy, fan-out oriented, and needs durable execution history.
+
+## 5.1 Why Temporal Fits This Product
+
+This product has workflow characteristics that align well with Temporal:
+
+- external dependencies are slow and flaky
+- many analysis steps are parallelizable
+- some steps may take minutes rather than seconds
+- partial progress is useful and should be resumable
+- retries and backoff are a first-class requirement
+- future monitoring and scheduled re-runs map naturally to recurring workflows
+- auditability matters for explaining how a risk assessment was produced
+
+Temporal should own execution state and retries.
+
+PostgreSQL should remain the source of truth for domain state, analysis results, and user-facing data.
 
 ## 6. End-to-End Workflow
 
@@ -111,6 +130,7 @@ System creates:
 - analysis record
 - target company record
 - workflow state = `queued`
+- Temporal `AnalysisWorkflow` execution
 
 ### Step 2: GitHub footprint discovery
 
@@ -208,6 +228,55 @@ The UI exposes:
 - risk portfolio
 - project dossier
 - executive brief export
+
+## 6.1 Temporal Workflow Topology
+
+The MVP should use one top-level workflow per company analysis.
+
+### Parent workflow
+
+`AnalysisWorkflow`
+
+Responsibilities:
+
+- coordinate the end-to-end analysis
+- fan out repo-level extraction
+- fan out project-level enrichment
+- collect partial failures
+- trigger final scoring and brief generation
+
+### Child workflows
+
+Use child workflows when a subtask is substantial, parallel, and worth isolating for retries and observability.
+
+Recommended child workflows:
+
+- `RepoEvidenceWorkflow(repo)`
+- `ProjectEnrichmentWorkflow(project)`
+
+### Activities
+
+Use activities for side-effecting or external calls such as:
+
+- GitHub API access
+- repo file fetching
+- web crawling
+- package registry lookups
+- OSV/CVE lookups
+- LLM inference
+- persistence writes
+- export generation
+
+### Determinism rule
+
+Temporal workflows must remain deterministic.
+
+Therefore:
+
+- external I/O belongs in activities
+- LLM calls belong in activities
+- scoring code may run in workflows only if fully deterministic and versioned
+- if scoring logic depends on data fetching or model calls, keep it in activities and persist the outputs
 
 ## 7. Agent Design
 
@@ -322,7 +391,7 @@ Suggested endpoints:
 
 Responsibilities:
 
-- execute multi-step analysis jobs
+- execute multi-step Temporal workflows
 - manage retries, timeouts, and partial failures
 - track workflow states
 
@@ -338,6 +407,20 @@ Suggested states:
 - `failed`
 - `partial`
 
+Suggested Temporal workflow types:
+
+- `AnalysisWorkflow`
+- `RepoEvidenceWorkflow`
+- `ProjectEnrichmentWorkflow`
+
+Suggested Temporal task queues:
+
+- `analysis`
+- `repo-evidence`
+- `project-enrichment`
+- `llm`
+- `exports`
+
 ### 8.3 Data Collection and Enrichment Service
 
 Responsibilities:
@@ -346,6 +429,7 @@ Responsibilities:
 - normalize source-specific fields
 - cache results
 - maintain adapter boundaries per source
+- run as Temporal activities behind clear retry policies
 
 ### 8.4 Scoring and Recommendation Service
 
@@ -355,6 +439,11 @@ Responsibilities:
 - assign tiers
 - generate constrained recommendations
 - expose score explanations
+
+This service should be invoked after enrichment fan-out has settled, either:
+
+- as deterministic in-workflow logic for purely local scoring, or
+- as a dedicated Temporal activity if implementation simplicity is preferred
 
 ## 9. Data Model
 
@@ -376,6 +465,8 @@ The MVP should store both raw evidence and normalized conclusions.
 - `id`
 - `company_id`
 - `status`
+- `temporal_workflow_id`
+- `temporal_run_id`
 - `requested_by_user_id`
 - `created_at`
 - `completed_at`
@@ -441,6 +532,20 @@ The MVP should store both raw evidence and normalized conclusions.
 - `maintainer_metrics_json`
 - `raw_summary`
 
+#### WorkflowEvent
+
+- `id`
+- `analysis_id`
+- `workflow_type`
+- `workflow_id`
+- `run_id`
+- `step_name`
+- `status`
+- `started_at`
+- `ended_at`
+- `attempt`
+- `error_summary`
+
 #### RiskAssessment
 
 - `id`
@@ -471,6 +576,14 @@ Project signals change over time. The architecture should snapshot project intel
 - old reports remain explainable
 - re-runs can compare deltas
 - later monitoring features have a foundation
+
+### 9.3 Why workflow metadata matters
+
+Temporal already stores execution history, but the product should still persist workflow identifiers and selected step summaries in Postgres so that:
+
+- UI screens can show progress without reading raw Temporal history
+- support and debugging are simpler
+- analytics queries stay out of the workflow engine
 
 ## 10. External Data Adapters
 
@@ -536,6 +649,17 @@ Every analysis should store:
 - feature extraction version
 
 This is required to compare results over time and explain drift.
+
+## 11.4 Temporal execution guidance
+
+Recommended execution model:
+
+- evidence collection = activities
+- enrichment = child workflows plus activities
+- scoring = one final stage after enrichment joins
+- explanation generation = activities
+
+This keeps the high-fan-out and failure-prone stages isolated while preserving a single parent execution record for each analysis.
 
 ## 12. Confidence Model
 
@@ -624,21 +748,47 @@ Every portfolio row should show:
 
 ## 15. Job Orchestration Model
 
-The MVP should use a workflow graph rather than one monolithic job.
+The MVP should use Temporal workflows rather than one monolithic job or a simple background queue.
 
-Suggested job chain:
+### Parent workflow: `AnalysisWorkflow`
 
-1. `resolve_github_org`
-2. `enumerate_public_repos`
-3. `extract_repo_artifact_evidence`
-4. `fetch_supporting_public_signals`
-5. `infer_candidate_projects`
-6. `resolve_canonical_projects`
-7. `select_top_projects_for_enrichment`
-8. `enrich_project`
-9. `compute_risk_assessments`
-10. `generate_brief`
-11. `finalize_analysis`
+Suggested flow:
+
+1. `create_analysis_record`
+2. `resolve_github_org`
+3. `enumerate_public_repos`
+4. fan out `RepoEvidenceWorkflow(repo)` across repos
+5. `fetch_supporting_public_signals`
+6. `infer_candidate_projects`
+7. `resolve_canonical_projects`
+8. `select_top_projects_for_enrichment`
+9. fan out `ProjectEnrichmentWorkflow(project)` across selected projects
+10. `compute_risk_assessments`
+11. `generate_brief`
+12. `finalize_analysis`
+
+### Child workflow: `RepoEvidenceWorkflow(repo)`
+
+Suggested flow:
+
+1. `fetch_repo_metadata`
+2. `discover_repo_artifacts`
+3. `extract_manifest_evidence`
+4. `extract_workflow_evidence`
+5. `extract_container_and_iac_evidence`
+6. `extract_repo_docs_evidence`
+7. `persist_repo_evidence`
+
+### Child workflow: `ProjectEnrichmentWorkflow(project)`
+
+Suggested flow:
+
+1. `fetch_project_repo_metadata`
+2. `fetch_release_history`
+3. `fetch_package_registry_metadata`
+4. `fetch_advisory_data`
+5. `compute_normalized_project_signals`
+6. `persist_project_snapshot`
 
 Parallelizable stages:
 
@@ -652,6 +802,23 @@ Serialized stages:
 - final scoring
 - brief generation
 
+### Retry posture
+
+Recommended Temporal retry behavior:
+
+- GitHub/API/network fetches: automatic retries with exponential backoff
+- crawling and parsing: retries for transient failures, capped for malformed content
+- LLM activities: limited retries, with prompt/output validation
+- scoring: fail fast if inputs are incomplete in unexpected ways
+
+### Timeouts
+
+Recommended timeout posture:
+
+- short activity timeouts for single fetches
+- longer child workflow timeouts for repo and project processing
+- longer parent workflow timeout for end-to-end analysis
+
 ## 16. Failure Handling
 
 Public-data workflows will be noisy. The architecture must support partial success.
@@ -663,6 +830,13 @@ Examples:
 - if briefing fails, preserve portfolio results and allow manual regeneration
 
 The `partial` analysis state should be treated as a first-class status.
+
+Temporal-specific guidance:
+
+- a child workflow failure should not necessarily fail the parent
+- repo-level failures should be recorded and the parent should continue when enough evidence remains
+- project enrichment failures should mark the project incomplete rather than abort the whole analysis
+- the parent workflow should aggregate unresolved failures into the final analysis status
 
 ## 17. Caching and Freshness
 
@@ -680,6 +854,8 @@ Caching matters because the same projects will recur across analyses.
 - advisory data: refresh frequently
 - company GitHub footprint signals: refresh on re-run or explicit invalidation
 - supporting public signals: refresh on re-run or explicit invalidation
+
+Temporal should not replace caching. Activities should consult caches before doing expensive or rate-limited work.
 
 ## 18. Security and Compliance
 
@@ -708,6 +884,14 @@ The MVP should track:
 - score distribution
 - export generation success
 
+Temporal-native observability should also capture:
+
+- parent workflow duration
+- child workflow duration distribution
+- activity retry counts
+- failure rate by activity type
+- fan-out size by analysis
+
 It should also persist audit logs for:
 
 - analysis created
@@ -727,7 +911,7 @@ It should also persist audit logs for:
 ### Integration tests
 
 - adapter normalization
-- workflow execution with fixture data
+- Temporal workflow execution with fixture data
 - API responses for completed and partial analyses
 
 ### Evaluation tests
@@ -741,6 +925,7 @@ It should also persist audit logs for:
 ### Milestone 1: Core pipeline
 
 - company intake
+- Temporal environment and worker setup
 - GitHub org resolution
 - repo and artifact extraction
 - supporting-source ingestion
@@ -777,6 +962,10 @@ Chosen because explainability and reproducibility matter more than agent freedom
 
 Chosen because the MVP does not yet justify a more complex stack.
 
+### Tradeoff 2a: Temporal over a simpler queue
+
+Chosen because the core analysis path is long-running, fan-out heavy, retry-heavy, and benefits from durable workflow history.
+
 ### Tradeoff 3: Deterministic scores plus generated explanations
 
 Chosen because pure LLM scoring is too hard to defend.
@@ -804,7 +993,7 @@ Chosen because GitHub artifacts provide more defensible dependency evidence than
 
 ## 25. Recommended Implementation Posture
 
-Build the MVP as a workflow-centric analyst system, not as a general-purpose autonomous agent platform.
+Build the MVP as a Temporal-orchestrated, workflow-centric analyst system, not as a general-purpose autonomous agent platform.
 
 The durable assets to invest in first are:
 
