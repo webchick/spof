@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spof"
+version = "0.1.0"
+description = "OSS dependency risk analysis platform"
+requires-python = ">=3.11"
+dependencies = [
+  "SQLAlchemy>=2.0,<3.0",
+  "alembic>=1.13,<2.0",
+  "psycopg[binary]>=3.1,<4.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.alembic]
+script_location = "alembic"
+
